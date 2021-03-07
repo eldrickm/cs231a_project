@@ -15,21 +15,31 @@ import numpy as np
 from charuco import charucoBoard
 from imutils.video import VideoStream
 
+from fullscreen.fullscreen import *
+
 
 CAMERA_RESOLUTION = (1920, 1088)
 SCREEN_RESOLUTION = (1920, 1080)
 QUIT_KEY = 'q'
 
 
-def show_fullscreen_image(frame, name='Preview'):
+def show_fullscreen_image(frame, name='Fullscreen Preview'):
     """
     Given an image, display the image in full screen.
     Use Case:
         > Display camera charuco pattern with projector.
         > Display camera preview
     """
+    screen = FullScreen(0)
+    screen.imshow(frame)
+
+
+def show_windowed_image(frame, name='Preview'):
+    """
+    Given an image, display the image in a window
+    """
     cv2.namedWindow(name, cv2.WND_PROP_FULLSCREEN)
-    #  cv2.setWindowProperty(name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    # cv2.setWindowProperty(name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     cv2.imshow(name, frame)
 
 
@@ -44,13 +54,11 @@ def preview_camera():
     """
     Display output of the camera
     """
-    #stream = VideoStream(src=2).start()
-    stream = cv2.VideoCapture(3)
-    #  stream = cv2.VideoStream(2, resolution=CAMERA_RESOLUTION).start()
-    #time.sleep(2)  # needed to allow camera to boot
+    stream = cv2.VideoCapture(2) # External web camera
+    time.sleep(2)  # needed to allow camera to boot
     while True:
         cap_success, frame = stream.read()
-        show_fullscreen_image(frame, 'Camera Preview')
+        show_windowed_image(frame, 'Camera Preview')
         if cv2.waitKey(1) & 255 == ord(QUIT_KEY):
             break
 
@@ -75,6 +83,7 @@ def preview_perspective(img_resolution=(1920, 1080)):
         if cv2.waitKey(1) & 255 == ord(QUIT_KEY):
             break
     cv2.destroyAllWindows()
+
 
 def main():
     """

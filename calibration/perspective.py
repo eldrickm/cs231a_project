@@ -21,11 +21,13 @@ from imutils.video import VideoStream
 def get_reference_image(img_resolution=(1920, 1080)):
     """
     Build the image we will be searching for.  In this case, we just want a
-    large white box (full screen)
+    large blue box (full screen)
     :param img_resolution: this is our screen/projector resolution
     """
     width, height = img_resolution
     img = np.ones((height, width, 1), np.uint8) * 255
+    #  img = np.zeros((height, width, 3), np.uint8)
+    #  img[:, :, 0] = 255
     return img
 
 
@@ -35,6 +37,9 @@ def find_edges(frame):
     :param frame: Camera Image
     :return: Found edges in image
     """
+    # Select blue channels only
+    #frame[:, :, 1] = 0
+    #frame[:, :, 2] = 0
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray = cv2.bilateralFilter(gray, 11, 17, 17)  # Add some blur
     edged = cv2.Canny(gray, 30, 200)  # Find our edges
@@ -50,7 +55,7 @@ def get_region_corners(frame):
     """
     edged = find_edges(frame)
     # findContours is destructive, so send in a copy
-    #image, contours, hierarchy = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # image, contours, hierarchy = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
     # Sort our contours by area, and keep the 10 largest
     contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
@@ -140,10 +145,9 @@ def get_perspective_transform(stream, screen_resolution, prop_file):
 
     # Grab a photo of the frame
     cap_success, frame = stream.read()
-    #frame = cv2.flip(stream.read(), flipCode=-1)
 
     # Remove the reference image from the display
-    preview.hide_fullscreen_image()
+    cv2.destroyAllWindows()
 
     # We're going to work with a smaller image, so we need to save the scale
     ratio = frame.shape[0] / 300.0
@@ -165,10 +169,10 @@ def get_perspective_transform(stream, screen_resolution, prop_file):
     m = cv2.getPerspectiveTransform(rect, dst)
 
     # Uncomment the lines below to see the transformed image
-    warp = cv2.warpPerspective(orig, m, (max_width, max_height))
+    #  warp = cv2.warpPerspective(orig, m, (max_width, max_height))
+    #  cv2.imshow('Perspective Transform', warp)
+    #  cv2.waitKey(0)
 
-    cv2.imshow('Perspective Transform', warp)
-    cv2.waitKey(0)
     return m, max_width, max_height
 
 
@@ -199,15 +203,33 @@ if __name__ == '__main__':
     # Camera frame resolution
     resolution = (args.get('camera_width'), args.get('camera_height'))
 
-    #stream = VideoStream(resolution=resolution).start()
-    #  stream = cv2.VideoStream(2, resolution=CAMERA_RESOLUTION).start()
-    stream = cv2.VideoCapture(3)
+    stream = cv2.VideoCapture(2)
     stream.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
     stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-
     time.sleep(2)  # Let the camera warm up
 
+    prop_file = args.get('camera_props')
+    camera_matrix, dist_coeffs = calibrate.load_camera_props(prop_file)
+    mapx, mapy = calibrate.get_undistort_maps(camera_matrix, dist_coeffs)
+
     screen_res = (args.get('screen_width'), args.get('screen_height'))
-    get_perspective_transform(stream, screen_res, args.get('camera_props'))
-    stream.stop()
+    m, max_width, max_height = get_perspective_transform(stream, screen_res, args.get('camera_props'))
+    
+    # Display a dark black image
+    width, height = resolution
+    img = np.zeros((height, width, 1), np.uint8)
+    preview.show_fullscreen_image(img)
+    while True:
+        # Get an image
+        cap_success, frame = stream.read()
+
+        # Remove Distortion
+        frame = calibrate.undistort_image(frame, mapx, mapy)
+
+        # Perspective Transform
+        frame = cv2.warpPerspective(frame, m, (max_width, max_height))
+
+        preview.show_windowed_image(frame)
+        if cv2.waitKey(1) & 255 == ord('q'):
+            break
     cv2.destroyAllWindows()

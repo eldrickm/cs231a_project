@@ -15,10 +15,12 @@ from imutils.video import VideoStream
 from charuco import charucoBoard
 from charuco import charucoDictionary
 from charuco import detectorParams
+from preview import show_fullscreen_image
 
 
 NUM_VALID_THRESHOLD = 50
 CAMERA_RESOLUTION = (1920, 1088)
+SCREEN_RESOLUTION = (1920, 1080)
 FRAME_SPACING = 5
 CAMERA_CONFIG_PATH = 'etc/camera_config.json'
 
@@ -81,7 +83,6 @@ def get_charuco_corners(stream):
 
     # Read Images Loop
     while True:
-        #frame = cv2.flip(stream.read(), flipCode=-1)
         cap_success, frame = stream.read()
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -110,10 +111,12 @@ def calibrate_camera():
     """
     Calibrate our camera
     """
+    # Display Charuco Calibration Board
+    charuco = charucoBoard.draw(SCREEN_RESOLUTION)
+    show_fullscreen_image(charuco, 'Calibration Board')
+
     # Step 1: Initialize Camera
-    #  stream = VideoStream(resolution=CAMERA_RESOLUTION).start()
-    #  stream = cv2.VideoStream(2, resolution=CAMERA_RESOLUTION).start()
-    stream = cv2.VideoCapture(3)
+    stream = cv2.VideoCapture(2)
     stream.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
     stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
     time.sleep(2)
@@ -141,14 +144,13 @@ def calibrate_camera():
 
     # Step 5: Show Calibrated Image
     while True:
-        #frame = cv2.flip(stream.read(), flipCode=-1)
         cap_success, frame = stream.read()
         frame = undistort_image(frame, mapx, mapy)
         cv2.imshow('Calibrated Image', frame)
         if cv2.waitKey(1) & 255 == ord('q'):
             break
 
-    stream.stop()
+    # stream.stop()
     cv2.destroyAllWindows()
 
 
