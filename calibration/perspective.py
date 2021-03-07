@@ -15,8 +15,6 @@ import numpy as np
 import preview
 import calibrate
 
-from imutils.video import VideoStream
-
 
 def get_reference_image(img_resolution=(1920, 1080)):
     """
@@ -26,8 +24,6 @@ def get_reference_image(img_resolution=(1920, 1080)):
     """
     width, height = img_resolution
     img = np.ones((height, width, 1), np.uint8) * 255
-    #  img = np.zeros((height, width, 3), np.uint8)
-    #  img[:, :, 0] = 255
     return img
 
 
@@ -37,9 +33,6 @@ def find_edges(frame):
     :param frame: Camera Image
     :return: Found edges in image
     """
-    # Select blue channels only
-    #frame[:, :, 1] = 0
-    #frame[:, :, 2] = 0
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray = cv2.bilateralFilter(gray, 11, 17, 17)  # Add some blur
     edged = cv2.Canny(gray, 30, 200)  # Find our edges
@@ -55,7 +48,6 @@ def get_region_corners(frame):
     """
     edged = find_edges(frame)
     # findContours is destructive, so send in a copy
-    # image, contours, hierarchy = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
     # Sort our contours by area, and keep the 10 largest
     contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
@@ -72,6 +64,7 @@ def get_region_corners(frame):
             break
     else:
         print('Did not find contour')
+
     # Uncomment these lines to see the contours on the image
     cv2.drawContours(frame, [screen_contours], -1, (0, 255, 0), 3)
     cv2.imshow('Screen', frame)
@@ -214,11 +207,12 @@ if __name__ == '__main__':
 
     screen_res = (args.get('screen_width'), args.get('screen_height'))
     m, max_width, max_height = get_perspective_transform(stream, screen_res, args.get('camera_props'))
-    
+
     # Display a dark black image
     width, height = resolution
     img = np.zeros((height, width, 1), np.uint8)
     preview.show_fullscreen_image(img)
+
     while True:
         # Get an image
         cap_success, frame = stream.read()
@@ -229,7 +223,7 @@ if __name__ == '__main__':
         # Perspective Transform
         frame = cv2.warpPerspective(frame, m, (max_width, max_height))
 
-        preview.show_windowed_image(frame)
+        cv2.imshow('Preview', frame)
         if cv2.waitKey(1) & 255 == ord('q'):
             break
     cv2.destroyAllWindows()

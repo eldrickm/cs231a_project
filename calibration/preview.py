@@ -1,29 +1,29 @@
 #! /usr/bin/env python3
 """
-A script to calibrate the PiCam module using a Charuco board
+Utilities to display images in full screen and preview camera stream
 
-- Change CAMERA_RESOLUTION to a lower resolution to improve
-  frame rate
+Notes:
+    - Change CAMERA_RESOLUTION to a lower resolution to improve
+      frame rate
 """
 
-import time
 import argparse
 
 import cv2
 import numpy as np
 
 from charuco import charucoBoard
-from imutils.video import VideoStream
-
-from fullscreen.fullscreen import *
+from fullscreen.fullscreen import FullScreen
 
 
-CAMERA_RESOLUTION = (1920, 1088)
 SCREEN_RESOLUTION = (1920, 1080)
+#  CAMERA_RESOLUTION = (1920, 1080)     # 1080p
+#  CAMERA_RESOLUTION = (1280, 720)      # 720p
+CAMERA_RESOLUTION = (640, 480)       # 480p
 QUIT_KEY = 'q'
 
 
-def show_fullscreen_image(frame, name='Fullscreen Preview'):
+def show_fullscreen_image(frame):
     """
     Given an image, display the image in full screen.
     Use Case:
@@ -34,31 +34,16 @@ def show_fullscreen_image(frame, name='Fullscreen Preview'):
     screen.imshow(frame)
 
 
-def show_windowed_image(frame, name='Preview'):
-    """
-    Given an image, display the image in a window
-    """
-    cv2.namedWindow(name, cv2.WND_PROP_FULLSCREEN)
-    # cv2.setWindowProperty(name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-    cv2.imshow(name, frame)
-
-
-def hide_fullscreen_image(name='Preview'):
-    """
-    Kill a named window
-    """
-    cv2.destroyWindow(name)
-
-
 def preview_camera():
     """
     Display output of the camera
     """
-    stream = cv2.VideoCapture(2) # External web camera
-    time.sleep(2)  # needed to allow camera to boot
+    stream = cv2.VideoCapture(2)
+    stream.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_RESOLUTION[0])
+    stream.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_RESOLUTION[1])
     while True:
-        cap_success, frame = stream.read()
-        show_windowed_image(frame, 'Camera Preview')
+        _, frame = stream.read()
+        cv2.imshow('Camera Preview', frame)
         if cv2.waitKey(1) & 255 == ord(QUIT_KEY):
             break
 
@@ -68,14 +53,17 @@ def preview_charuco():
     Display an image until user presses "q" to quit
     """
     charuco = charucoBoard.draw(SCREEN_RESOLUTION)
-    show_fullscreen_image(charuco, 'Calibration Board')
+    show_fullscreen_image(charuco)
     while True:
         if cv2.waitKey(1) & 255 == ord(QUIT_KEY):
             break
     cv2.destroyAllWindows()
 
 
-def preview_perspective(img_resolution=(1920, 1080)):
+def preview_whiteboard(img_resolution=(1920, 1080)):
+    """
+    Display an all white image
+    """
     width, height = img_resolution
     img = np.ones((height, width, 1), np.uint8) * 255
     show_fullscreen_image(img)
@@ -93,14 +81,14 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-c", "--camera", action="store_true")
     group.add_argument("-b", "--board", action="store_true")
-    group.add_argument("-p", "--perspective", action="store_true")
+    group.add_argument("-w", "--whiteboard", action="store_true")
     args = parser.parse_args()
     if args.camera:
         preview_camera()
     elif args.board:
         preview_charuco()
-    elif args.perspective:
-        preview_perspective()
+    elif args.whiteboard:
+        preview_whiteboard()
     else:
         preview_camera()
 

@@ -10,7 +10,6 @@ import cv2
 import numpy as np
 
 from cv2 import aruco
-from imutils.video import VideoStream
 
 from charuco import charucoBoard
 from charuco import charucoDictionary
@@ -113,7 +112,7 @@ def calibrate_camera():
     """
     # Display Charuco Calibration Board
     charuco = charucoBoard.draw(SCREEN_RESOLUTION)
-    show_fullscreen_image(charuco, 'Calibration Board')
+    show_fullscreen_image(charuco)
 
     # Step 1: Initialize Camera
     stream = cv2.VideoCapture(2)
