@@ -15,6 +15,19 @@ import numpy as np
 import preview
 import calibrate
 
+PERSPECTIVE_PATH = '../etc/perspective.json'
+
+def load_perspective(perspective_file=PERSPECTIVE_PATH):
+    """
+    Load the perspective transform from file
+    """
+    with open(perspective_file, 'r') as f:
+        data = json.load(f)
+    m = np.array(data.get('m'))
+    max_width = np.array(data.get('max_width'))
+    max_height = np.array(data.get('max_height'))
+    return m, max_width, max_height
+
 
 def get_reference_image(img_resolution=(1920, 1080)):
     """
@@ -181,7 +194,7 @@ def parse_args():
     ap.add_argument('-ch', '--camera_height', type=int, default=1088,
                     help='Camera image height')
     # camera property file
-    ap.add_argument('-f', '--camera_props', default='etc/camera_config.json',
+    ap.add_argument('-f', '--camera_props', default='../etc/camera_config.json',
                     help='Camera property file')
     # Screen resolution
     ap.add_argument('-sw', '--screen_width', type=int, default=1920,
@@ -207,6 +220,9 @@ if __name__ == '__main__':
 
     screen_res = (args.get('screen_width'), args.get('screen_height'))
     m, max_width, max_height = get_perspective_transform(stream, screen_res, args.get('camera_props'))
+
+    calibrate.save_json({'m': m.tolist(), 'max_width': max_width,
+                         'max_height': max_height}, filename=PERSPECTIVE_PATH)
 
     # Display a dark black image
     width, height = resolution

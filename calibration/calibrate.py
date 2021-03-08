@@ -18,18 +18,17 @@ from preview import show_fullscreen_image
 
 
 NUM_VALID_THRESHOLD = 50
-CAMERA_RESOLUTION = (1920, 1088)
+CAMERA_RESOLUTION = (1920, 1080)
 SCREEN_RESOLUTION = (1920, 1080)
 FRAME_SPACING = 5
-CAMERA_CONFIG_PATH = 'etc/camera_config.json'
+CAMERA_CONFIG_PATH = '../etc/camera_config.json'
 
 
-def save_json(data):
+def save_json(data, filename=CAMERA_CONFIG_PATH):
     """
     Save our data object as json to the camera_config file
     :param data: data to  write to file
     """
-    filename = CAMERA_CONFIG_PATH
     print('Saving to file: ' + filename)
     json_data = json.dumps(data)
     with open(filename, 'w') as jsonfile:

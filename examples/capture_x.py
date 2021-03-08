@@ -4,12 +4,9 @@ Capture projection pattern and decode x-coorde.
 import cv2
 import numpy as np
 import structuredlight as sl
-from fullscreen.fullscreen import *
 
 def imshowAndCapture(cap, img_pattern, delay=250):
-    #  cv2.imshow("", img_pattern)
-    screen = FullScreen(0)
-    screen.imshow(img_pattern)
+    cv2.imshow("", img_pattern)
     cv2.waitKey(delay)
     ret, img_frame = cap.read()
     img_gray = cv2.cvtColor(img_frame, cv2.COLOR_BGR2GRAY)
@@ -19,7 +16,7 @@ def main():
     width  = 640
     height = 480
 
-    cap = cv2.VideoCapture(2) # External web camera
+    cap = cv2.VideoCapture(1) # External web camera
     gray = sl.Gray()
    
     # Generate and Decode x-coord
