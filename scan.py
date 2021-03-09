@@ -23,7 +23,7 @@ PROP_FILE = './etc/camera_config.json'
 PERSPECTIVE_FILE = './etc/perspective.json'
 #CAMERA_RESOLUTION = (1920, 1080)       # 1080p
 # Need to really downsample resolution if using stripe
-CAMERA_RESOLUTION = (640 // 8, 360 // 8)         # 480p
+CAMERA_RESOLUTION = (640 // 2, 360 // 2)         # 480p
 VIDEO_BUFFER_LEN = 4
 
 def flush_cap(cap):
@@ -301,8 +301,9 @@ P1 = np.concatenate((np.dot(projector_K, projector_R),
 triangulated_points = cv2.triangulatePoints(P0, P1, camera_norm, proj_norm)
 points_3d = cv2.convertPointsFromHomogeneous(triangulated_points.T)
 
-filtered = points_3d[points_3d[:, :, 2] < 5000]
-filtered = points_3d[points_3d[:, :, 2] > 4500]
+filtered = points_3d[:, 0, :]
+#filtered = points_3d[points_3d[:, :, 2] < 5000]
+#filtered = points_3d[points_3d[:, :, 2] > 4500]
 
 
 pcd = o3d.geometry.PointCloud()
