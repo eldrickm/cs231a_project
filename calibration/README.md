@@ -5,7 +5,7 @@ Run via `./calibrate.py`
 - Saves as JSON
 
 # Perspective Transform
-Run via `./perspectiv.py` 
+Run via `./perspective.py` 
 - Projects white box, simple edge detection for corner detection
 - Computes perspective transform homography
 - Saves as JSON
