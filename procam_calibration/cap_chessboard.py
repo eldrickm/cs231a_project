@@ -6,7 +6,7 @@ import numpy as np
 import os
 import fullscreen.fullscreen as fs
 
-CAMERA_RESOLUTION = (640 // 2, 360 // 2) 
+CAMERA_RESOLUTION = (1080, 720) 
 
 def imshowAndCapture(cap, img_pattern, delay=250):
     screen = fs.FullScreen(0)
@@ -45,7 +45,7 @@ def main():
         else:
             str_ind = str(index)
 
-        cv2.imwrite("./capture0/graycode_" + str_ind + ".png", img)
+        cv2.imwrite("./capture_0/graycode_" + str_ind + ".png", img)
     cv2.destroyAllWindows()
     cap.release()
 
