@@ -6,26 +6,37 @@ import numpy as np
 import os
 import fullscreen.fullscreen as fs
 
-CAMERA_RESOLUTION = (1080, 720) 
+CAMERA_RESOLUTION = (1920, 1080)
+VIDEO_BUFFER_LEN = 1
 
-def imshowAndCapture(cap, img_pattern, delay=250):
-    screen = fs.FullScreen(0)
+def flush_cap(cap):
+    """
+    An attempt to flush the video capture buffer.
+    Needed because the first VIDEO_BUFFER_LEN frames of a series of captures
+    essentially won't update properly / will be stale.
+    This is unfortunately a hardware issue and can't be easily disabled
+    """
+    for i in range(5):
+        cap.grab()
+
+
+def imshowAndCapture(cap, img_pattern, screen, delay=50):
     screen.imshow(img_pattern)
     cv2.waitKey(delay)
     ret, img_frame = cap.read()
+    cv2.waitKey(delay)
+    img_frame = cv2.resize(img_frame, CAMERA_RESOLUTION)
     img_gray = cv2.cvtColor(img_frame, cv2.COLOR_BGR2GRAY)
     return img_gray
 
-def main():
-    width  = 640
-    height = 480
 
+def main():
     cap = cv2.VideoCapture(0) # External web camera
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_RESOLUTION[0])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_RESOLUTION[1])
    
     # Get graycode pattern files
-    images = [None] * 42
+    images = [None] * len(os.listdir('./graycode_pattern/'))
 
     for filename in os.listdir('./graycode_pattern/'):
         if filename.endswith(".png"): 
@@ -35,8 +46,18 @@ def main():
         else:
             continue
 
+    for i in range(VIDEO_BUFFER_LEN):
+        images.append(images[-1])
+
     # Capture
-    imlist = [ imshowAndCapture(cap, img) for img in images]
+    screen = fs.FullScreen(0)
+    black = np.zeros(CAMERA_RESOLUTION)
+    screen.imshow(black)
+    flush_cap(cap)
+    imlist = [imshowAndCapture(cap, img, screen) for img in images]
+
+    # Chop off lagging frames
+    imlist = imlist[VIDEO_BUFFER_LEN:]
 
     # Save files
     for index, img in enumerate(imlist):

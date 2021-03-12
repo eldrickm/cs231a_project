@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'calibration/'))
 
 import cv2
 import numpy as np
+import json
 import matplotlib.pyplot as plt
 import open3d as o3d
 
@@ -18,9 +19,8 @@ import fullscreen.fullscreen as fs
 import calibration.calibrate as calibrate
 import calibration.perspective as perspective
 
-CAMERA_NUM = 2
-PROP_FILE = './etc/camera_config.json'
-PERSPECTIVE_FILE = './etc/perspective.json'
+CAMERA_NUM = 0
+CALIBRATION_FILE = './procam_calibration/calibration_result.json'
 #CAMERA_RESOLUTION = (1920, 1080)       # 1080p
 # Need to really downsample resolution if using stripe
 CAMERA_RESOLUTION = (640 // 2, 360 // 2)         # 480p
@@ -64,13 +64,17 @@ Example:
         projector_t = d['projector_t']
 """
 
-camera_K, camera_d = calibrate.load_camera_props(PROP_FILE)
+with open(CALIBRATION_FILE, 'r') as f:
+    data = json.load(f)
+
+camera_K = np.array(data.get('cam_int')['data']).reshape(3,3)
+camera_d = np.array(data.get('cam_dist')['data'])
 
 # Placeholders
-projector_K = camera_K
-projector_d = camera_d
-projector_R = np.eye(3)
-projector_t = np.array([[ 5, 5, 5], ]).T
+projector_K = np.array(data.get('proj_int')['data']).reshape(3,3)
+projector_d = np.array(data.get('proj_dist')['data'])
+projector_R = np.array(data.get('rotation')['data']).reshape(3,3)
+projector_t = np.array(data.get('translation')['data']).reshape(3,1)
 #mapx, mapy = calibrate.get_undistort_maps(camera_K, camera_d)
 #m, max_width, max_height = perspective.load_perspective(PERSPECTIVE_FILE)
 
@@ -295,8 +299,8 @@ P0 = np.dot(camera_K, np.array([[1,0,0,0],
                                 [0,0,1,0]]))
 
 # Projector Perspective Matrix
-P1 = np.concatenate((np.dot(projector_K, projector_R),
-                     np.dot(projector_K, projector_t)), axis=1)
+P1 = np.concatenate((projector_K @ projector_R, projector_K @ projector_t),
+                    axis=1)
 
 triangulated_points = cv2.triangulatePoints(P0, P1, camera_norm, proj_norm)
 points_3d = cv2.convertPointsFromHomogeneous(triangulated_points.T)
