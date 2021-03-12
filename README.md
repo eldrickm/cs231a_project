@@ -31,4 +31,4 @@ Projector-Camera Structured Light Imaging for Facial Depth Mapping
 
 [dclemmon/projection_mapping](https://github.com/dclemmon/projection_mapping)
 - Initial implementation of camera calibration and perspective transformation
-- Modified source files in `calibration/`
+- Modified source files in `camera_tools/`

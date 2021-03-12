@@ -44,6 +44,8 @@ Captured images must be saved as `./capture_*/graycode_*.(png/jpg)`.
    </tr>
 </table>
 
+Capturing these patterns can be done with `cap_chessboard.py`
+
 ### Step 3 : Calibrate projector & camera parameters
 
 After saving captured images, run the following command.

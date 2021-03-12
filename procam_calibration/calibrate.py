@@ -251,7 +251,7 @@ def calibrate(dirnames, gc_fname_lists, proj_shape, chess_shape, chess_block_siz
 
 proj_shape = (1080, 1920)
 chess_shape = (9, 7)
-chess_block_size = 24
+chess_block_size = 75
 gc_step = 1
 black_thr = 40
 white_thr = 5

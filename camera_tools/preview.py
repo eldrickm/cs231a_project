@@ -22,9 +22,7 @@ from fullscreen.fullscreen import FullScreen
 
 
 SCREEN_RESOLUTION = (1920, 1080)
-#  CAMERA_RESOLUTION = (1920, 1080)     # 1080p
-#  CAMERA_RESOLUTION = (1280, 720)      # 720p
-CAMERA_RESOLUTION = (640, 480)       # 480p
+CAMERA_RESOLUTION = (1920, 1080)     # 1080p
 CAMERA_NUM = 0
 QUIT_KEY = 'q'
 

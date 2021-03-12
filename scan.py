@@ -1,12 +1,9 @@
 #! /usr/ bin/env python3
 
 """
-Capture projection pattern and decode both xy.
+Project, capture, and decode a structured light pattern scan.
+Plot 3D Points
 """
-import os
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'calibration/'))
 
 import cv2
 import numpy as np
