@@ -23,7 +23,7 @@ def flush_cap(cap):
         cap.grab()
 
 
-def imshowAndCapture(cap, img_pattern, screen, delay=50):
+def imshowAndCapture(cap, img_pattern, screen, delay=500):
     screen.imshow(img_pattern)
     cv2.waitKey(delay)
     ret, img_frame = cap.read()
@@ -62,23 +62,24 @@ def main():
     # Chop off lagging frames
     imlist = imlist[VIDEO_BUFFER_LEN:]
 
+    # Create new capture directory
     dirnames = sorted(glob.glob('./captures/capture_*'))
     most_recent_capture = dirnames[-1]
     tokenized = most_recent_capture.split('_')
     most_recent_index = int(tokenized[1])
     new_capture_index = most_recent_index + 1
     new_capture_dir = tokenized[0] + '_' + str(new_capture_index) + '/'
-    print(new_capture_dir)
+    os.mkdir(new_capture_dir)
 
     # Save files
-    os.mkdir(new_capture_dir)
+    print("Saving to " + new_capture_dir)
     for index, img in enumerate(imlist):
         if(index < 10):
             str_ind = '0' + str(index)
         else:
             str_ind = str(index)
-
         cv2.imwrite(new_capture_dir + "graycode_" + str_ind + ".png", img)
+
     cv2.destroyAllWindows()
     cap.release()
 

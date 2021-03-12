@@ -22,6 +22,17 @@ CALIBRATION_FILE = './etc/calibration_result.json'
 CAMERA_RESOLUTION = (1280 // 4, 720 // 4)         # 720p
 VIDEO_BUFFER_LEN = 4
 
+
+#%%
+"""
+Step 1: Project and Capture Structured Light Pattern
+
+Project and capture structured light patterns
+
+Our output here is a stack of N images which contain a structured light pattern
+We likely want to use positive / negative thresholding here
+"""
+
 def flush_cap(cap):
     """
     An attempt to flush the video capture buffer.
@@ -32,59 +43,7 @@ def flush_cap(cap):
     for i in range(5):
         cap.grab()
 
-#%%
-"""
-Step 0: Camera and Projector Calibration
 
-Before we get started, we need the following parameters:
-    - camera_K    - Camera Intrinsics
-    - camera_d    - Camera Distortion Coefficients
-    - projector_K - Projector Intrinsics
-    - projector_d - Projector Distortion Coefficients
-    - projector_R - Projector Rotation wrt Camera
-    - projector_t - Projector Translation wrt Camera
-
-We can assume that the camera is at world origin.
-
-We'll want to compute this data before-hand and just load it here.
-
-Example:
-
-    with open("stereo_calibration.pckl","r") as f:
-        d = pickle.load(f)
-        camera_K    = d['camera_K']
-        camera_d    = d['camera_d']
-        projector_K = d['projector_K']
-        projector_d = d['projector_d']
-        projector_R = d['projector_R']
-        projector_t = d['projector_t']
-"""
-
-with open(CALIBRATION_FILE, 'r') as f:
-    data = json.load(f)
-
-camera_K = np.array(data.get('cam_int')['data']).reshape(3,3)
-camera_d = np.array(data.get('cam_dist')['data'])
-
-# Placeholders
-projector_K = np.array(data.get('proj_int')['data']).reshape(3,3)
-projector_d = np.array(data.get('proj_dist')['data'])
-projector_R = np.array(data.get('rotation')['data']).reshape(3,3)
-projector_t = np.array(data.get('translation')['data']).reshape(3,1)
-
-#%%
-"""
-Step 1: Project and Capture Structured Light Pattern
-
-Project and capture structured light patterns
-
-Our output here is a stack of N images which contain a structured light pattern
-We likely want to use positive / negative thresholding here
-
-Example:
-
-    captures = [imshowAndCapture(cap, img) for img in patterns]
-"""
 # Capture Background
 cap = cv2.VideoCapture(CAMERA_NUM)  # External web camera
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_RESOLUTION[0])
@@ -97,6 +56,8 @@ screen.imshow(black)
 flush_cap(cap)
 _, background = cap.read()
 
+color_image = cv2.resize(background, CAMERA_RESOLUTION)
+color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
 background = cv2.resize(background, CAMERA_RESOLUTION)
 background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
 
@@ -146,6 +107,7 @@ def imshowAndCapture(cap, img_pattern, screen, delay=10):
     img_frame = cv2.resize(img_frame, CAMERA_RESOLUTION)
     img_gray = cv2.cvtColor(img_frame, cv2.COLOR_BGR2GRAY)
     return img_gray
+
 
 # Generate Scan Pattern
 # Stripe Pattern
@@ -227,34 +189,43 @@ This gives us 2D correspondences
 x_index = stripe.decode(x_subtracted)
 y_index = stripe.decode(y_subtracted)
 
-# Visualize decode result
+# Merge X and Y correspondences
 img_correspondence = cv2.merge([0.0 * np.zeros_like(x_index),
                                 x_index / CAMERA_RESOLUTION[0],
                                 y_index / CAMERA_RESOLUTION[1]])
 
+# Clip correspondences to 8b
 img_correspondence = np.clip(img_correspondence * 255, 0,255)
 img_correspondence = img_correspondence.astype(np.uint8)
+
+# Mask correspondences with projectable area to eliminate sprurious points
 img_correspondence[~is_projectable] = 0
 
+# Visualize correspondences
 plt.figure()
 plt.imshow(img_correspondence)
 plt.axis('off')
 plt.title('Correspondence Map')
 
+# Construct 2D correspondences
+# x_p and y_p are the 2D coordinates in projector image space
 x_p = np.expand_dims(x_index[is_projectable].flatten(), -1)
 y_p = np.expand_dims(y_index[is_projectable].flatten(), -1)
 projector_points = np.hstack((x_p, y_p))
 
+# x and y are the 2D coordinates in camera image space
 xx, yy = np.meshgrid(np.arange(CAMERA_RESOLUTION[0]),
                    np.arange(CAMERA_RESOLUTION[1]))
 x = np.expand_dims(xx[is_projectable].flatten(), -1)
 y = np.expand_dims(yy[is_projectable].flatten(), -1)
-#x = np.expand_dims(np.arange(CAMERA_RESOLUTION[1]), -1)
-#y = np.expand_dims(np.arange(CAMERA_RESOLUTION[0]), -1)
 camera_points = np.hstack((x, y))
 
+# Get RGB values for all valid points
+color_points = color_image[camera_points[:, 1], camera_points[:, 0]]
+color_points = color_points.astype(np.float64) / 255
 
-# Needed for OpenCV Triangulation
+
+# Needed for OpenCV Triangulation - add a middle axis, convert to float
 camera_points = np.expand_dims(camera_points, 1).astype(np.float32)
 projector_points = np.expand_dims(projector_points, 1).astype(np.float32)
 
@@ -262,15 +233,34 @@ projector_points = np.expand_dims(projector_points, 1).astype(np.float32)
 """
 Step 3: Undistort Correspondences
 
+We need the following parameters:
+    - camera_K    - Camera Intrinsics
+    - camera_d    - Camera Distortion Coefficients
+    - projector_K - Projector Intrinsics
+    - projector_d - Projector Distortion Coefficients
+    - projector_R - Projector Rotation wrt Camera
+    - projector_t - Projector Translation wrt Camera
+
+We can assume that the camera is at world origin.
+
+We'll want to compute this data before-hand and just load it here.
+
 Use camera and projector intrinsics and distortion coefficiens
 to undistort our 2D correspondences
-
-Example:
-    camera_norm = cv2.undistortPoints(camera_points, camera_K, camera_d,
-                                      P=camera_K)
-    proj_norm = cv2.undistortPoints(projector_points, projector_K, projector_d,
-                                    P=projector_K)
 """
+
+with open(CALIBRATION_FILE, 'r') as f:
+    data = json.load(f)
+
+camera_K = np.array(data.get('cam_int')['data']).reshape(3,3)
+camera_d = np.array(data.get('cam_dist')['data'])
+
+# Placeholders
+projector_K = np.array(data.get('proj_int')['data']).reshape(3,3)
+projector_d = np.array(data.get('proj_dist')['data'])
+projector_R = np.array(data.get('rotation')['data']).reshape(3,3)
+projector_t = np.array(data.get('translation')['data']).reshape(3,1)
+
 
 camera_norm = cv2.undistortPoints(camera_points, camera_K, camera_d,
                                   P=camera_K)
@@ -283,17 +273,6 @@ Step 4: Triangulation
 
 Formulate intrinsics and extrinsics of camera and projector.
 Use those to triangulate the 3D positions of each pixel.
-
-Example:
-    P0 = np.dot(camera_K, np.array([[1,0,0,0],
-                                    [0,1,0,0],
-                                    [0,0,1,0]]))
-
-    P1 = np.concatenate((np.dot(projector_K,projector_R),
-                         np.dot(projector_K,projector_t)), axis=1)
-
-    triang_res = cv2.triangulatePoints(P0, P1, camera_norm, proj_norm)
-    points_3d = cv2.convertPointsFromHomogeneous(triang_res.T)
 """
 # Camera Perspective Matrix - Location at World Origin
 P0 = np.dot(camera_K, np.array([[1,0,0,0],
@@ -301,17 +280,22 @@ P0 = np.dot(camera_K, np.array([[1,0,0,0],
                                 [0,0,1,0]]))
 
 # Projector Perspective Matrix
-P1 = np.concatenate((projector_K @ projector_R, projector_K @ projector_t),
+# P1 = np.concatenate((projector_K @ projector_R, projector_K @ projector_t),
+#                     axis=1)
+P1 = np.concatenate((camera_K @ projector_R, camera_K @ projector_t),
                     axis=1)
 
+
+# Triangulate and de-homogenize points into 3D space
 triangulated_points = cv2.triangulatePoints(P0, P1, camera_norm, proj_norm)
 points_3d = cv2.convertPointsFromHomogeneous(triangulated_points.T)
 
-filtered = points_3d[:, 0, :]
-filtered = points_3d[points_3d[:, :, 2] < 2000]
-filtered = points_3d[points_3d[:, :, 2] > 0]
+color_3d = np.hstack((points_3d[:, 0, :], color_points))
 
+# Filter points as needed
+filtered = color_3d
 
 pcd = o3d.geometry.PointCloud()
-pcd.points = o3d.utility.Vector3dVector(filtered)
+pcd.points = o3d.utility.Vector3dVector(filtered[:, :3])
+pcd.colors = o3d.utility.Vector3dVector(filtered[:, 3:])
 o3d.visualization.draw_geometries([pcd]) # Visualize the point cloud

@@ -249,21 +249,24 @@ def calibrate(dirnames, gc_fname_lists, proj_shape, chess_shape, chess_block_siz
 # if __name__ == '__main__':
 #     main()
 
+#%%
+# User supplied parameters
 proj_shape = (1080, 1920)
 chess_shape = (9, 7)
-chess_block_size = 75
+chess_block_size = .024
 gc_step = 1
 black_thr = 40
 white_thr = 5
-
 camera_param_file = str()
 
+# Find Capture Directories
+print("Searching for capture directories... ")
 dirnames = sorted(glob.glob('./captures/capture_*'))
-if len(dirnames) == 0:
-    print('Directories \'./capture_*\' were not found')
-    assert(False)
+assert len(dirnames) > 0, 'Directories \'./capture_*\' were not found'
+print("")
 
-print('Searching input files ...')
+# Find populated capture directories
+print('Searching capture directories for input files ...')
 used_dirnames = []
 gc_fname_lists = []
 for dname in dirnames:
@@ -272,113 +275,139 @@ for dname in dirnames:
         continue
     used_dirnames.append(dname)
     gc_fname_lists.append(gc_fnames)
-    print(' \'' + dname + '\' was found')
+    print(dname + '/ was found')
+print("")
 
+
+# Process user-supplied camera intrinsic parameters
 camP = None
 cam_dist = None
 path, ext = os.path.splitext(camera_param_file)
 if(ext == ".json"):
-    camP,cam_dist = loadCameraParam(camera_param_file)
-    print('load camera parameters')
+    camP, cam_dist = loadCameraParam(camera_param_file)
+    print('Loaded user-supplied camera parameters')
     print(camP)
     print(cam_dist)
+    print("")
 
-
+# Populate list of checkerboard corners with proper spacing
 objps = np.zeros((chess_shape[0]*chess_shape[1], 3), np.float32)
 objps[:, :2] = chess_block_size * \
     np.mgrid[0:chess_shape[0], 0:chess_shape[1]].T.reshape(-1, 2)
 
-print('Calibrating ...')
+print("Setting up Gray code pattern utilities")
 gc_height = int((proj_shape[0]-1)/gc_step)+1
 gc_width = int((proj_shape[1]-1)/gc_step)+1
-graycode = cv2.structured_light_GrayCodePattern.create(
-    gc_width, gc_height)
-graycode.setBlackThreshold(black_thr)
-graycode.setWhiteThreshold(white_thr)
+graycode = cv2.structured_light_GrayCodePattern.create(gc_width, gc_height)
+# graycode.setBlackThreshold(black_thr)
+# graycode.setWhiteThreshold(white_thr)
+print("")
 
+# TODO: What is patch size?
+print("Calculating patch size")
 cam_shape = cv2.imread(gc_fname_lists[0][0], cv2.IMREAD_GRAYSCALE).shape
 patch_size_half = int(np.ceil(cam_shape[1] / 180))
-print('  patch size :', patch_size_half * 2 + 1)
+print('  Patch size: ', patch_size_half * 2 + 1)
+print("")
 
 cam_corners_list = []
 cam_objps_list = []
 cam_corners_list2 = []
 proj_objps_list = []
 proj_corners_list = []
-for dname, gc_filenames in zip(dirnames, gc_fname_lists):
-    print('  checking \'' + dname + '\'')
-    if len(gc_filenames) != graycode.getNumberOfPatternImages() + 2:
-        print('Error : invalid number of images in \'' + dname + '\'')
-        assert(False)
-        # return None
 
+print('Calibrating...')
+dir_index = 0
+for dname, gc_filenames in zip(dirnames, gc_fname_lists):
+    # Check we have number of expected images in directory
+    print('  Checking ' + dname + '/')
+    assert len(gc_filenames) == graycode.getNumberOfPatternImages() + 2, \
+           'Error : invalid number of images in ' + dname
+
+    # Populate list with all images in directory
     imgs = []
     for fname in gc_filenames:
         img = cv2.imread(fname, cv2.IMREAD_GRAYSCALE)
-        if cam_shape != img.shape:
-            print('Error : image size of \'' + fname + '\' is mismatch')
-            # return None
+        assert cam_shape == img.shape,\
+              'Error : Image \'' + fname + '\' has incorrect dimensions'
         imgs.append(img)
+    
+    # Retrieve illuminated and dark image
     black_img = imgs.pop()
     white_img = imgs.pop()
 
+    # Find coordinates of chessboard corners
+    # TODO: Use sub-pixel coordinates?
     res, cam_corners = cv2.findChessboardCorners(white_img, chess_shape)
-    if not res:
-        print('Error : chessboard was not found in \'' +
-              gc_filenames[-2] + '\'')
-        assert(False)
-        # return None
+    assert res, 'Error: No chessboard in ' + gc_filenames[-2] + '/'
+
+    # Add corresponding chessboard corners with image chessboard corners
     cam_objps_list.append(objps)
     cam_corners_list.append(cam_corners)
 
     proj_objps = []
     proj_corners = []
     cam_corners2 = []
-    # viz_proj_points = np.zeros(proj_shape, np.uint8)
-    i = 0
+    viz_proj_points = np.zeros(proj_shape, np.uint8)
+    # Iterate through all corners in the image
+    # For each image corner, find the corresponding projector pixel
     for corner, objp in zip(cam_corners, objps):
-        print(i)
-        i += 1
+        # Round the corners to nearest integer (needed if subpixel used)
         c_x = int(round(corner[0][0]))
         c_y = int(round(corner[0][1]))
+
+        # Find camera <-> projector correspondences based on a local area
+        # around the corner (patch)
         src_points = []
-        dst_points = []
+        dst_points = []        
         for dx in range(-patch_size_half, patch_size_half + 1):
             for dy in range(-patch_size_half, patch_size_half + 1):
                 x = c_x + dx
                 y = c_y + dy
+                # TODO: How do we make this threshold more robust?
                 if int(white_img[y, x]) - int(black_img[y, x]) <= black_thr:
                     continue
                 err, proj_pix = graycode.getProjPixel(imgs, x, y)
                 if not err:
                     src_points.append((x, y))
                     dst_points.append(gc_step*np.array(proj_pix))
-        if len(src_points) < patch_size_half**2:
-            print(
-                '    Warning : corner', c_x, c_y,
-                'was skiped because decoded pixels were too few (check your images and threasholds)')
+
+        # TODO: What is this patch_size_hald ** 2 threshold?
+        # Check your images and thresholds if this fails
+        if len(src_points) < patch_size_half ** 2:
+            print('    Warning: corner', c_x, c_y, 'skipped.')
+            print("      Decoded %d points but need %d" %
+                  (len(src_points), patch_size_half**2))
             continue
-        h_mat, inliers = cv2.findHomography(
-            np.array(src_points), np.array(dst_points))
-        point = h_mat@np.array([corner[0][0], corner[0][1], 1]).transpose()
+
+        # Calculate local homography between the corners
+        h_mat, inliers = cv2.findHomography(np.array(src_points),
+                                            np.array(dst_points))
+        
+        # Use the local homography to convert images from camera space
+        # to projector space
+        point = h_mat @ np.array([corner[0][0], corner[0][1], 1]).transpose()
         point_pix = point[0:2]/point[2]
         proj_objps.append(objp)
         proj_corners.append([point_pix])
+        # Store valid corners (those with corresponding projector corners) only
         cam_corners2.append(corner)
-        # viz_proj_points[int(round(point_pix[1])),
-        #                 int(round(point_pix[0]))] = 255
-    if len(proj_corners) < 3:
-        print('Error : too few corners were found in \'' +
-              dname + '\' (less than 3)')
-        # return None
-        assert(False)
+        # Plot projector corner
+        viz_proj_points[int(round(point_pix[1])),
+                        int(round(point_pix[0]))] = 255
+
+    assert len(proj_corners) > 2, ('Error: too few corners were found in ' +
+                                   dname + '/ (less than 3)')
+
     proj_objps_list.append(np.float32(proj_objps))
     proj_corners_list.append(np.float32(proj_corners))
     cam_corners_list2.append(np.float32(cam_corners2))
-    # cv2.imwrite('visualize_corners_projector_' +
-    #             str(cnt) + '.png', viz_proj_points)
-    # cnt += 1
+    cv2.imwrite('./projector_corners/visualize_corners_projector_' +
+                str(dir_index) + '.png', viz_proj_points)
+    dir_index += 1
+    print("")
 
+print("")
 print('Initial solution of camera\'s intrinsic parameters')
 cam_rvecs = []
 cam_tvecs = []
@@ -428,7 +457,7 @@ printNumpyWithIndent(cam_proj_rmat, '    ')
 printNumpyWithIndent(cam_proj_tvec, '    ')
 print()
 
-fs = cv2.FileStorage('calibration_result.json', cv2.FILE_STORAGE_WRITE)
+fs = cv2.FileStorage('../etc/calibration_result.json', cv2.FILE_STORAGE_WRITE)
 fs.write('img_shape', cam_shape)
 fs.write('rms', ret)
 fs.write('cam_int', cam_int)
