@@ -52,7 +52,7 @@ def main():
 
     camera_param_file = args.camera
 
-    dirnames = sorted(glob.glob('./capture_*'))
+    dirnames = sorted(glob.glob('./captures/capture_*'))
     if len(dirnames) == 0:
         print('Directories \'./capture_*\' were not found')
         return
@@ -249,7 +249,7 @@ def calibrate(dirnames, gc_fname_lists, proj_shape, chess_shape, chess_block_siz
 # if __name__ == '__main__':
 #     main()
 
-proj_shape = (720, 1080)
+proj_shape = (1080, 1920)
 chess_shape = (9, 7)
 chess_block_size = 24
 gc_step = 1
@@ -258,7 +258,7 @@ white_thr = 5
 
 camera_param_file = str()
 
-dirnames = sorted(glob.glob('./capture_*'))
+dirnames = sorted(glob.glob('./captures/capture_*'))
 if len(dirnames) == 0:
     print('Directories \'./capture_*\' were not found')
     assert(False)

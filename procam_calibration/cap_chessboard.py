@@ -7,7 +7,7 @@ import os
 import fullscreen.fullscreen as fs
 
 CAMERA_RESOLUTION = (1920, 1080)
-VIDEO_BUFFER_LEN = 1
+VIDEO_BUFFER_LEN = 4
 
 def flush_cap(cap):
     """
@@ -20,7 +20,7 @@ def flush_cap(cap):
         cap.grab()
 
 
-def imshowAndCapture(cap, img_pattern, screen, delay=50):
+def imshowAndCapture(cap, img_pattern, screen, delay=500):
     screen.imshow(img_pattern)
     cv2.waitKey(delay)
     ret, img_frame = cap.read()
@@ -66,7 +66,7 @@ def main():
         else:
             str_ind = str(index)
 
-        cv2.imwrite("./capture_0/graycode_" + str_ind + ".png", img)
+        cv2.imwrite("./captures/capture_0/graycode_" + str_ind + ".png", img)
     cv2.destroyAllWindows()
     cap.release()
 

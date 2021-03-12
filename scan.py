@@ -10,20 +10,19 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'calibration/'))
 
 import cv2
 import numpy as np
+import scipy.stats as stats
 import json
 import matplotlib.pyplot as plt
 import open3d as o3d
 
 import structuredlight as sl
 import fullscreen.fullscreen as fs
-import calibration.calibrate as calibrate
-import calibration.perspective as perspective
 
 CAMERA_NUM = 0
-CALIBRATION_FILE = './procam_calibration/calibration_result.json'
+CALIBRATION_FILE = './etc/calibration_result.json'
 #CAMERA_RESOLUTION = (1920, 1080)       # 1080p
 # Need to really downsample resolution if using stripe
-CAMERA_RESOLUTION = (640 // 2, 360 // 2)         # 480p
+CAMERA_RESOLUTION = (1280 // 4, 720 // 4)         # 720p
 VIDEO_BUFFER_LEN = 4
 
 def flush_cap(cap):
@@ -75,8 +74,6 @@ projector_K = np.array(data.get('proj_int')['data']).reshape(3,3)
 projector_d = np.array(data.get('proj_dist')['data'])
 projector_R = np.array(data.get('rotation')['data']).reshape(3,3)
 projector_t = np.array(data.get('translation')['data']).reshape(3,1)
-#mapx, mapy = calibrate.get_undistort_maps(camera_K, camera_d)
-#m, max_width, max_height = perspective.load_perspective(PERSPECTIVE_FILE)
 
 #%%
 """
@@ -119,7 +116,9 @@ illuminated = cv2.cvtColor(illuminated, cv2.COLOR_BGR2GRAY)
 cap.release()
 cv2.destroyAllWindows()
 
-is_projectable = (illuminated > (background + 75))
+subtracted = illuminated.astype(np.float32) - background.astype(np.float32)
+subtracted = np.clip(subtracted, 0, 255)
+is_projectable = (subtracted > np.mean(subtracted))
 
 
 plt.figure()
@@ -131,6 +130,11 @@ plt.figure()
 plt.imshow(illuminated, cmap='gray')
 plt.axis('off')
 plt.title('Illuminated Image')
+
+plt.figure()
+plt.imshow(subtracted, cmap='gray')
+plt.axis('off')
+plt.title('Subtracted Image')
 
 plt.figure()
 plt.imshow(is_projectable, cmap='gray')
@@ -233,6 +237,7 @@ img_correspondence = cv2.merge([0.0 * np.zeros_like(x_index),
 
 img_correspondence = np.clip(img_correspondence * 255, 0,255)
 img_correspondence = img_correspondence.astype(np.uint8)
+img_correspondence[~is_projectable] = 0
 
 plt.figure()
 plt.imshow(img_correspondence)
@@ -251,12 +256,12 @@ y = np.expand_dims(yy[is_projectable].flatten(), -1)
 #y = np.expand_dims(np.arange(CAMERA_RESOLUTION[0]), -1)
 camera_points = np.hstack((x, y))
 
-#%%
+
 # Needed for OpenCV Triangulation
 camera_points = np.expand_dims(camera_points, 1).astype(np.float32)
 projector_points = np.expand_dims(projector_points, 1).astype(np.float32)
 
-#%%
+
 """
 Step 3: Undistort Correspondences
 
@@ -275,7 +280,7 @@ camera_norm = cv2.undistortPoints(camera_points, camera_K, camera_d,
 proj_norm = cv2.undistortPoints(projector_points, projector_K, projector_d,
                                 P=camera_K)
 
-#%%
+
 """
 Step 4: Triangulation
 
@@ -306,8 +311,8 @@ triangulated_points = cv2.triangulatePoints(P0, P1, camera_norm, proj_norm)
 points_3d = cv2.convertPointsFromHomogeneous(triangulated_points.T)
 
 filtered = points_3d[:, 0, :]
-#filtered = points_3d[points_3d[:, :, 2] < 5000]
-#filtered = points_3d[points_3d[:, :, 2] > 4500]
+filtered = points_3d[points_3d[:, :, 2] < 2000]
+filtered = points_3d[points_3d[:, :, 2] > 0]
 
 
 pcd = o3d.geometry.PointCloud()

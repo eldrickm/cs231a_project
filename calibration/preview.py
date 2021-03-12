@@ -25,6 +25,7 @@ SCREEN_RESOLUTION = (1920, 1080)
 #  CAMERA_RESOLUTION = (1920, 1080)     # 1080p
 #  CAMERA_RESOLUTION = (1280, 720)      # 720p
 CAMERA_RESOLUTION = (640, 480)       # 480p
+CAMERA_NUM = 0
 QUIT_KEY = 'q'
 
 
@@ -43,7 +44,7 @@ def preview_camera():
     """
     Display output of the camera
     """
-    stream = cv2.VideoCapture(2)
+    stream = cv2.VideoCapture(CAMERA_NUM)
     stream.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_RESOLUTION[0])
     stream.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_RESOLUTION[1])
     while True:
