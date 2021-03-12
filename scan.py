@@ -293,7 +293,8 @@ points_3d = cv2.convertPointsFromHomogeneous(triangulated_points.T)
 color_3d = np.hstack((points_3d[:, 0, :], color_points))
 
 # Filter points as needed
-filtered = color_3d
+filtered = color_3d[np.logical_and(color_3d[:, 2] < 0.865, color_3d[:, 2] > 0.81)]
+#filtered = color_3d
 
 pcd = o3d.geometry.PointCloud()
 pcd.points = o3d.utility.Vector3dVector(filtered[:, :3])
